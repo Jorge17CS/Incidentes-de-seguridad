@@ -1,1 +1,5 @@
-aaaaa
+Firewall perimetral / UTM: controla el tráfico entre la red interna e Internet. Amenazas: reglas mal configuradas, firmware sin actualizar, evasión de filtros.
+Servidor de autenticación (Active Directory / LDAP): gestiona identidades, credenciales y permisos de los usuarios. Amenazas: robo de credenciales, escalada de privilegios, ataques de fuerza bruta o pass-the-hash.
+Sistema SIEM y registros de logs: centraliza y correlaciona eventos de seguridad para detectar incidentes. Amenazas: manipulación o borrado de logs, falta de monitorización, saturación de eventos.
+Copias de seguridad (backups): garantizan la recuperación ante incidentes como el ransomware. Amenazas: cifrado o eliminación de las copias, almacenamiento sin cifrar, restauraciones no probadas.
+Credenciales y claves criptográficas (certificados, claves SSH, secretos de API): protegen el acceso y la confidencialidad de sistemas y comunicaciones. Amenazas: almacenamiento inseguro, claves expuestas en repositorios, certificados caducados.
