@@ -13,6 +13,7 @@ Usé qwen3.5:4b como modelo base. Para que contestara más rápido creé un mode
 
 <img width="1094" height="283" alt="image" src="https://github.com/user-attachments/assets/f1f2135c-fa85-4225-b07c-829e5dfff005" />
 <img width="524" height="60" alt="image" src="https://github.com/user-attachments/assets/81f4f01b-a7f5-4930-8e45-918bca1a92db" />
+El archivo está en [Modelfile](Modelfile).
 
 ## 4. Modelo de embeddings
 Para el RAG descargué `nomic-embed-text`, que convierte los textos en vectores y permite buscar los más parecidos a la pregunta.
