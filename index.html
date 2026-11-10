@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Asistente de ayuda en ciberseguridad</title>
+<style>
+  *{box-sizing:border-box}
+  body{
+    margin:0;min-height:100vh;font-family:"Segoe UI",Arial,sans-serif;
+    background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+    display:flex;align-items:center;justify-content:center;padding:24px;color:#1e293b
+  }
+  .card{
+    width:100%;max-width:760px;background:#fff;border-radius:18px;
+    box-shadow:0 20px 50px rgba(0,0,0,.35);overflow:hidden
+  }
+  header{
+    background:linear-gradient(135deg,#0ea5e9,#2563eb);color:#fff;padding:28px 32px
+  }
+  header h1{margin:0 0 6px;font-size:26px}
+  header p{margin:0;opacity:.9;font-size:15px}
+  main{padding:28px 32px 32px}
+  label{display:block;font-weight:600;margin-bottom:8px}
+  textarea{
+    width:100%;height:130px;padding:14px;font-size:15px;font-family:inherit;
+    border:2px solid #e2e8f0;border-radius:12px;resize:vertical;outline:none;
+    transition:border-color .2s,box-shadow .2s
+  }
+  textarea:focus{border-color:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.15)}
+  button{
+    margin-top:14px;padding:12px 26px;font-size:16px;font-weight:600;color:#fff;
+    background:linear-gradient(135deg,#0ea5e9,#2563eb);border:none;border-radius:10px;
+    cursor:pointer;transition:transform .15s,opacity .15s
+  }
+  button:hover{transform:translateY(-1px)}
+  button:disabled{opacity:.6;cursor:wait;transform:none}
+  #respuesta{
+    white-space:pre-wrap;margin-top:24px;padding:18px 20px;background:#f1f5f9;
+    border-left:5px solid #2563eb;border-radius:10px;min-height:70px;line-height:1.6;
+    display:none
+  }
+  .cargando{display:flex;align-items:center;gap:12px;color:#475569}
+  .spinner{
+    width:20px;height:20px;border:3px solid #cbd5e1;border-top-color:#2563eb;
+    border-radius:50%;animation:giro .8s linear infinite
+  }
+  @keyframes giro{to{transform:rotate(360deg)}}
+  footer{padding:0 32px 22px;font-size:12px;color:#94a3b8}
+</style>
+</head>
+<body>
+<div class="card">
+  <header>
+    <h1>🛡️ Asistente de ayuda en ciberseguridad</h1>
+    <p>Cuéntanos qué te ha pasado y te guiaremos paso a paso.</p>
+  </header>
+  <main>
+    <label for="pregunta">Describe tu problema</label>
+    <textarea id="pregunta" placeholder="Ej: Hice clic en un enlace de un correo del banco y puse mi contraseña"></textarea>
+    <button id="btn">Pedir ayuda</button>
+    <div id="respuesta"></div>
+  </main>
+  <footer>Funciona en local con Ollama + RAG. Ante cualquier duda grave, contacta con tu equipo de IT.</footer>
+</div>
+
+<script>
+const OLLAMA = "http://localhost:11434";
+const MODELO = "rapido";
+const EMB = "nomic-embed-text";
+
+// Base de conocimiento (RAG)
+const KB = [
+ "Si hiciste clic en un enlace sospechoso pero no introdujiste datos: cierra la pestaña, no descargues nada, ejecuta un análisis antivirus y avisa a IT o seguridad.",
+ "Si introdujiste tu contraseña en una web falsa: cambia la contraseña inmediatamente desde la web oficial, activa la verificación en dos pasos, revisa los inicios de sesión recientes y cierra todas las sesiones abiertas. Si usas esa contraseña en otros sitios, cámbiala también allí.",
+ "Si abriste un archivo adjunto sospechoso: desconecta el equipo de la red (Wi-Fi y cable), no lo apagues, avisa a IT y no abras más archivos hasta que lo revisen. Ejecuta un análisis completo con el antivirus.",
+ "Si diste datos bancarios o de tarjeta: llama a tu banco para bloquear la tarjeta o cuenta, revisa los movimientos recientes, reclama los cargos no reconocidos y presenta denuncia si hubo pérdida de dinero.",
+ "Cómo reportar un phishing: no respondas al correo, no reenvíes el mensaje a compañeros. Usa el botón de reportar phishing del cliente de correo o reenvíalo como adjunto al equipo de seguridad. Después elimínalo.",
+ "Cómo reconocer un correo de phishing: remitente que no coincide con la empresa real, urgencia o amenazas, errores de redacción, enlaces cuyo destino real (al pasar el ratón) no es el oficial, y peticiones de contraseñas o datos personales.",
+ "Medidas de prevención: usar verificación en dos pasos, un gestor de contraseñas, no abrir adjuntos inesperados, comprobar la URL antes de iniciar sesión, mantener el sistema actualizado y formar a los empleados con simulacros de phishing.",
+ "Si recibes un SMS (smishing) o una llamada (vishing) sospechosa: no pulses enlaces, no des códigos recibidos por SMS, cuelga y llama tú al número oficial de la entidad."
+];
+let vectores = null;
+
+async function embed(textos){
+  const r = await fetch(OLLAMA + "/api/embed", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({model: EMB, input: textos})
+  });
+  return (await r.json()).embeddings;
+}
+
+function coseno(a,b){
+  let p=0,na=0,nb=0;
+  for(let i=0;i<a.length;i++){p+=a[i]*b[i];na+=a[i]*a[i];nb+=b[i]*b[i];}
+  return p/(Math.sqrt(na)*Math.sqrt(nb));
+}
+
+async function buscar(pregunta, k=2){
+  if(!vectores) vectores = await embed(KB);
+  const [q] = await embed([pregunta]);
+  return vectores
+    .map((v,i)=>({i, s:coseno(q,v)}))
+    .sort((a,b)=>b.s-a.s)
+    .slice(0,k)
+    .map(x=>KB[x.i]);
+}
+
+const SISTEMA = `Eres un asistente de ciberseguridad especializado en incidentes de phishing. Hablas en español, con un tono claro y tranquilizador, para usuarios sin conocimientos técnicos.
+
+REGLAS:
+1. Responde SOLO con la información del CONTEXTO. Si el contexto no cubre la situación, dilo y recomienda contactar con el equipo de seguridad o de IT.
+2. No inventes pasos, enlaces ni herramientas que no aparezcan en el contexto.
+3. Si el usuario indica que ya hizo clic, introdujo credenciales o abrió un adjunto, pon primero las acciones urgentes.
+4. Nunca pidas contraseñas ni datos personales al usuario.
+
+FORMATO DE RESPUESTA (breve):
+- Gravedad: Baja / Media / Alta (una frase de por qué)
+- Pasos a seguir: lista numerada, máximo 6 pasos, cada uno en una línea
+- Cómo evitarlo en el futuro: 1 o 2 consejos`;
+
+const btn = document.getElementById("btn");
+const out = document.getElementById("respuesta");
+
+btn.onclick = async () => {
+  const pregunta = document.getElementById("pregunta").value.trim();
+  out.style.display = "block";
+  if(!pregunta){ out.textContent = "Escribe tu problema primero."; return; }
+  btn.disabled = true;
+  out.innerHTML = '<div class="cargando"><div class="spinner"></div>Buscando información y generando respuesta...</div>';
+  try{
+    const trozos = await buscar(pregunta);
+    const r = await fetch(OLLAMA + "/api/chat", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        model: MODELO, stream:false, think:false,
+        options:{num_ctx:2048, num_predict:250, temperature:0.3},
+        messages:[
+          {role:"system", content: SISTEMA + "\n\nCONTEXTO:\n" + trozos.join("\n")},
+          {role:"user", content: pregunta}
+        ]
+      })
+    });
+    const d = await r.json();
+    out.textContent = d.message.content;
+  }catch(e){
+    out.textContent = "Error al conectar con Ollama: " + e.message;
+  }
+  btn.disabled = false;
+};
+</script>
+</body>
+</html>
